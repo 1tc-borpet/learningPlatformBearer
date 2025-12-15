@@ -1,12 +1,6 @@
 # Learning Platform API - JWT Authentication Migration
 
-##  Migráció Sanctumról JWT-re - SIKERES!
-
-A Learning Platform API sikeresen átállt **Laravel Sanctum**-ról **JWT (JSON Web Token)** alapú autentikációra.
-
 ---
-
-##  Mi változott?
 
 ### 1. **JWT Package Telepítése**
 ```bash
