@@ -10,9 +10,12 @@ Route::get('/ping', function () { return response()->json(['message'=>'API works
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
-// Authenticated
-Route::middleware('auth:sanctum')->group(function () {
+// Authenticated with JWT
+Route::middleware('auth:api')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/refresh', [AuthController::class, 'refresh']);
+    Route::get('/me', [AuthController::class, 'me']);
+    
     Route::get('/users/me', [UserController::class, 'me']);
     Route::put('/users/me', [UserController::class, 'updateMe']);
 

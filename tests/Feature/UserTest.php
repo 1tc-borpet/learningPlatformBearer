@@ -5,13 +5,19 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
-use Laravel\Sanctum\Sanctum; 
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Testing\Fluent\AssertableJson;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class UserTest extends TestCase
 {
     use RefreshDatabase; // Az adatbázis hibák (no such table: users) elkerülésére
+    
+    protected function actingAsUser($user)
+    {
+        $token = JWTAuth::fromUser($user);
+        return $this->withHeader('Authorization', 'Bearer ' . $token);
+    }
 
     // ----------------------------------------------------------------------------------
     // 1. /users/me (GET) - Lekérés
@@ -30,11 +36,8 @@ class UserTest extends TestCase
         // ARRANGE: Felhasználó létrehozása
         $user = User::factory()->create(['role' => 'student']);
         
-        // ACT: Felhasználó hitelesítése a Sanctum-mal
-        Sanctum::actingAs($user); 
-
-        // ACT: Kérés küldése
-        $response = $this->getJson('/api/users/me');
+        // ACT: Kérés küldése JWT tokennel
+        $response = $this->actingAsUser($user)->getJson('/api/users/me');
 
         // ASSERT: Ellenőrizzük a státuszt és a válasz struktúráját (userController.php alapján)
         $response->assertStatus(200)
@@ -53,12 +56,11 @@ class UserTest extends TestCase
     public function test_user_can_update_their_own_name_and_email()
     {
         $user = User::factory()->create(['name' => 'Old Name', 'email' => 'old@example.com']);
-        Sanctum::actingAs($user); 
 
         $newEmail = 'new@example.com';
         $newName = 'New Name';
 
-        $response = $this->putJson('/api/users/me', [
+        $response = $this->actingAsUser($user)->putJson('/api/users/me', [
             'name' => $newName,
             'email' => $newEmail,
         ]);
@@ -79,11 +81,10 @@ class UserTest extends TestCase
     public function test_user_can_update_their_password()
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user); 
 
         $newPassword = 'New_Secure_Password_2025';
 
-        $response = $this->putJson('/api/users/me', [
+        $response = $this->actingAsUser($user)->putJson('/api/users/me', [
             'password' => $newPassword,
             'password_confirmation' => $newPassword,
         ]);
@@ -102,9 +103,8 @@ class UserTest extends TestCase
     public function test_student_cannot_access_user_list()
     {
         $student = User::factory()->create(['role' => 'student']);
-        Sanctum::actingAs($student); 
 
-        $response = $this->getJson('/api/users');
+        $response = $this->actingAsUser($student)->getJson('/api/users');
 
         // userController.php 120. sor: return response()->json(['message' => 'Forbidden'], 403);
         $response->assertStatus(403)
@@ -117,9 +117,7 @@ class UserTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
         $students = User::factory(3)->create(['role' => 'student']);
         
-        Sanctum::actingAs($admin); 
-
-        $response = $this->getJson('/api/users');
+        $response = $this->actingAsUser($admin)->getJson('/api/users');
 
         $response->assertStatus(200)
                  ->assertJsonStructure(['data' => [
@@ -144,9 +142,7 @@ class UserTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
         $targetUser = User::factory()->create(['role' => 'student', 'name' => 'Target User']);
         
-        Sanctum::actingAs($admin); 
-
-        $response = $this->getJson("/api/users/{$targetUser->id}");
+        $response = $this->actingAsUser($admin)->getJson("/api/users/{$targetUser->id}");
 
         $response->assertStatus(200)
                  ->assertJsonPath('user.name', 'Target User');
@@ -157,9 +153,7 @@ class UserTest extends TestCase
         $student = User::factory()->create(['role' => 'student']);
         $otherUser = User::factory()->create(['role' => 'student']);
         
-        Sanctum::actingAs($student); 
-
-        $response = $this->getJson("/api/users/{$otherUser->id}");
+        $response = $this->actingAsUser($student)->getJson("/api/users/{$otherUser->id}");
 
         $response->assertStatus(403)
                  ->assertJson(['message' => 'Forbidden']);
@@ -174,9 +168,7 @@ class UserTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
         $userToDelete = User::factory()->create();
         
-        Sanctum::actingAs($admin); 
-
-        $response = $this->deleteJson("/api/users/{$userToDelete->id}");
+        $response = $this->actingAsUser($admin)->deleteJson("/api/users/{$userToDelete->id}");
 
         $response->assertStatus(200)
                  ->assertJson(['message' => 'User deleted successfully']);
@@ -190,9 +182,7 @@ class UserTest extends TestCase
         $student = User::factory()->create(['role' => 'student']);
         $userToDelete = User::factory()->create();
         
-        Sanctum::actingAs($student); 
-
-        $response = $this->deleteJson("/api/users/{$userToDelete->id}");
+        $response = $this->actingAsUser($student)->deleteJson("/api/users/{$userToDelete->id}");
 
         $response->assertStatus(403)
                  ->assertJson(['message' => 'Forbidden']);

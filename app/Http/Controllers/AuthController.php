@@ -5,6 +5,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
@@ -19,7 +20,7 @@ class AuthController extends Controller
         } catch (ValidationException $e) {
             return response()->json([
                 'message' => 'Failed to register user',
-                'errors' => $e->errors() // visszaadja, mely mezők hibásak
+                'errors' => $e->errors()
             ], 422);
         }
 
@@ -43,13 +44,13 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
-        $user = User::where('email', $request->email)->first();
+        $credentials = $request->only('email', 'password');
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (!$token = auth('api')->attempt($credentials)) {
             return response()->json(['message' => 'Invalid email or password'], 401);
         }
 
-        $token = $user->createToken('api-token')->plainTextToken;
+        $user = auth('api')->user();
 
         return response()->json([
             'message' => 'Login successful',
@@ -61,15 +62,31 @@ class AuthController extends Controller
             ],
             'access' => [
                 'token' => $token,
-                'token_type' => 'Bearer'
+                'token_type' => 'Bearer',
+                'expires_in' => auth('api')->factory()->getTTL() * 60
             ]
         ]);
     }
 
-    public function logout(Request $request)
+    public function logout()
     {
-        $request->user()->tokens()->delete(); //minden token törlése
-        //$request->user()->currentAccessToken()->delete(); //aktuális token törlése, más eszközökön marad a bejelentkezés 
+        auth('api')->logout();
         return response()->json(['message' => 'Logout successful']);
+    }
+
+    public function refresh()
+    {
+        return response()->json([
+            'access' => [
+                'token' => auth('api')->refresh(),
+                'token_type' => 'Bearer',
+                'expires_in' => auth('api')->factory()->getTTL() * 60
+            ]
+        ]);
+    }
+
+    public function me()
+    {
+        return response()->json(auth('api')->user());
     }
 }

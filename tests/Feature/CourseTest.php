@@ -6,12 +6,18 @@ use App\Models\Course;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
-use Laravel\Sanctum\Sanctum; 
 use Illuminate\Testing\Fluent\AssertableJson;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class CourseTest extends TestCase
 {
     use RefreshDatabase; // Elengedhetetlen az adatbázis táblák létrehozásához
+    
+    protected function actingAsUser($user)
+    {
+        $token = JWTAuth::fromUser($user);
+        return $this->withHeader('Authorization', 'Bearer ' . $token);
+    }
 
     // ----------------------------------------------------------------------------------
     // 1. /courses (GET) - Lista lekérése
@@ -35,10 +41,8 @@ class CourseTest extends TestCase
         Course::create(['title' => 'Kurzus B', 'description' => 'Leírás B']);
         Course::create(['title' => 'Kurzus C', 'description' => 'Leírás C']);
         
-        Sanctum::actingAs($user); 
-
-        // ACT: Kérés küldése
-        $response = $this->getJson('/api/courses');
+        // ACT: Kérés küldése JWT tokennel
+        $response = $this->actingAsUser($user)->getJson('/api/courses');
 
         // ASSERT: Ellenőrizzük a státuszt és a struktúrát
         $response->assertStatus(200)
@@ -68,10 +72,8 @@ class CourseTest extends TestCase
         $student1->courses()->attach($course->id, ['enrolled_at' => now()]);
         $student2->courses()->attach($course->id, ['enrolled_at' => now(), 'completed_at' => now()]);
         
-        Sanctum::actingAs($user); 
-
-        // ACT: Kérés küldése
-        $response = $this->getJson("/api/courses/{$course->id}");
+        // ACT: Kérés küldése JWT tokennel
+        $response = $this->actingAsUser($user)->getJson("/api/courses/{$course->id}");
 
         // ASSERT: Ellenőrizzük a státuszt és a fészkelt struktúrát
         $response->assertStatus(200)
@@ -93,10 +95,9 @@ class CourseTest extends TestCase
         $user = User::factory()->create();
         // <<< MANUÁLIS LÉTREHOZÁS FACTORY HELYETT
         $course = Course::create(['title' => 'Beiratkozó Kurzus', 'description' => 'Leírás']);
-        Sanctum::actingAs($user); 
 
-        // ACT: Beiratkozás
-        $response = $this->postJson("/api/courses/{$course->id}/enroll");
+        // ACT: Beiratkozás JWT tokennel
+        $response = $this->actingAsUser($user)->postJson("/api/courses/{$course->id}/enroll");
 
         $response->assertStatus(200)
                  ->assertJson(['message' => 'Successfully enrolled in course']);
@@ -114,13 +115,12 @@ class CourseTest extends TestCase
         $user = User::factory()->create();
         // <<< MANUÁLIS LÉTREHOZÁS FACTORY HELYETT
         $course = Course::create(['title' => 'Már Beiratkozott Kurzus', 'description' => 'Leírás']);
-        Sanctum::actingAs($user); 
         
         // Először beiratkozunk
         $user->courses()->attach($course->id, ['enrolled_at' => now()]);
 
-        // ACT: Újra megpróbáljuk
-        $response = $this->postJson("/api/courses/{$course->id}/enroll");
+        // ACT: Újra megpróbáljuk JWT tokennel
+        $response = $this->actingAsUser($user)->postJson("/api/courses/{$course->id}/enroll");
 
         $response->assertStatus(409)
                  ->assertJson(['message' => 'Already enrolled in this course']);
@@ -134,14 +134,13 @@ class CourseTest extends TestCase
     {
         $user = User::factory()->create();
         // <<< MANUÁLIS LÉTREHOZÁS FACTORY HELYETT
-        $course = Course::create(['title' => 'Teljesíthető Kurzus', 'description' => 'Leírás']);
-        Sanctum::actingAs($user); 
+        $course = Course::create(['title' => 'Teljesíthő Kurzus', 'description' => 'Leírás']);
         
         // Beiratkozás
         $user->courses()->attach($course->id, ['enrolled_at' => now()]);
 
-        // ACT: Teljesítés
-        $response = $this->patchJson("/api/courses/{$course->id}/completed");
+        // ACT: Teljesítés JWT tokennel
+        $response = $this->actingAsUser($user)->patchJson("/api/courses/{$course->id}/completed");
 
         $response->assertStatus(200)
                  ->assertJson(['message' => 'Course completed']);
@@ -159,10 +158,9 @@ class CourseTest extends TestCase
         $user = User::factory()->create();
         // <<< MANUÁLIS LÉTREHOZÁS FACTORY HELYETT
         $course = Course::create(['title' => 'Nem Beiratkozott Kurzus', 'description' => 'Leírás']);
-        Sanctum::actingAs($user); 
         
-        // ACT: Teljesítés beiratkozás nélkül
-        $response = $this->patchJson("/api/courses/{$course->id}/completed");
+        // ACT: Teljesítés beiratkozás nélkül JWT tokennel
+        $response = $this->actingAsUser($user)->patchJson("/api/courses/{$course->id}/completed");
 
         $response->assertStatus(403)
                  ->assertJson(['message' => 'Not enrolled in this course']);
@@ -173,13 +171,12 @@ class CourseTest extends TestCase
         $user = User::factory()->create();
         // <<< MANUÁLIS LÉTREHOZÁS FACTORY HELYETT
         $course = Course::create(['title' => 'Már Teljesített Kurzus', 'description' => 'Leírás']);
-        Sanctum::actingAs($user); 
         
         // Beiratkozás és teljesítés
         $user->courses()->attach($course->id, ['enrolled_at' => now(), 'completed_at' => now()]);
 
-        // ACT: Újra megpróbáljuk a teljesítést
-        $response = $this->patchJson("/api/courses/{$course->id}/completed");
+        // ACT: Újra megpróbáljuk a teljesítést JWT tokennel
+        $response = $this->actingAsUser($user)->patchJson("/api/courses/{$course->id}/completed");
 
         $response->assertStatus(409)
                  ->assertJson(['message' => 'Course already completed']);

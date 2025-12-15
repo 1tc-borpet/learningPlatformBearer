@@ -54,14 +54,12 @@ class AuthTest extends TestCase
             'password' => $password, // A bejelentkezéshez a plain text jelszót adjuk
         ]);
 
-        // ASSERT: Ellenőrizzük a státuszt és a válasz struktúráját
+        // ASSERT: Ellenőrizzük a státuszt és a válasz struktúráját (JWT)
         $response->assertStatus(200)
-                 ->assertJsonStructure(['message', 'user' => ['id', 'name', 'email', 'role'], 'access' => ['token', 'token_type']]);
+                 ->assertJsonStructure(['message', 'user' => ['id', 'name', 'email', 'role'], 'access' => ['token', 'token_type', 'expires_in']]);
 
-        // Opcionális: Ellenőrizzük, hogy létrejött-e token
-        $this->assertDatabaseHas('personal_access_tokens', [
-            'tokenable_id' => $user->id,
-        ]);
+        // JWT nem tárol tokeneket az adatbázisban, ezért ezt nem ellenőrizzük
+        // A token a válaszban van és JWT formátumú
     }
 
     public function test_login_with_invalid_credentials()
